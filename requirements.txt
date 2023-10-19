@@ -1,0 +1,6 @@
+python-dotenv
+atlassian-python-api
+dataclasses
+typing
+requests
+markdown
