@@ -1,7 +1,7 @@
 # Imports
 from os import replace
 import re
-import uuid 
+import uuid
 
 
 class Translator():
@@ -9,30 +9,48 @@ class Translator():
   # If any attachments found, converted to one of two types depending on extension
   @staticmethod
   def attachments_markdown_to_confluence_xml(content: str) -> str:
-    fileRegex = "src=\"/.attachments\/.*\""
-    matches = re.findall(fileRegex, content)
+    print(f"DEBUG: Input content preview: {content[:200]}...")  # Debug
+    
+    # Keressük az img tageket
+    img_pattern = r'<img[^>]*src="(/.attachments/[^"]+)"[^>]*/?>' 
+    matches = re.findall(img_pattern, content)
+    print(f"DEBUG: Found image matches: {matches}")  # Debug
+    
     if not matches:
       return content
-    imageFileExtentions = [".jpeg", ".png", "jpg"]
-    fileNames = [match.split('/')[2] for match in matches if "http" not in match and "." in match]
-    replaceRegex = "<img alt=\".*\" src=\".*\".*/>"
-    imageFileExtentions = ["jpeg", "png", "jpg"]
-    for fileName in fileNames:
-      attachementString = re.search(replaceRegex, content).group()
-      if any(x in attachementString for x in imageFileExtentions):
-        # filename includeds a closing " which is why there is no closing 
-        confluenceLink = f"<ac:image><ri:attachment ri:filename=\"{fileName} /></ac:image>"
-      else:
-        confluenceLink = f"<ac:structured-macro ac:name=\"view-file\" ac:schema-version=\"1\" ac:macro-id=\"{uuid.uuid4()}\"><ac:parameter ac:name=\"name\"><ri:attachment ri:filename=\"{fileName} /></ac:parameter><ac:parameter ac:name=\"height\">250</ac:parameter></ac:structured-macro>"
-      #print("Confluence Link: ", confluenceLink)
-      content = content.replace(attachementString, confluenceLink)
-      #print(content)
+      
+    imageFileExtensions = [".jpeg", ".png", ".jpg", ".gif"]
+    
+    for attachment_path in matches:
+      # Kivesszük a fájlnevet az útvonalból
+      fileName = attachment_path.split('/')[-1]
+      print(f"DEBUG: Processing file: {fileName}")  # Debug
+      
+      # Keressük meg az eredeti img taget
+      img_tag_pattern = r'<img[^>]*src="' + re.escape(attachment_path) + r'"[^>]*/?>' 
+      img_matches = re.findall(img_tag_pattern, content)
+      
+      if img_matches:
+        original_img_tag = img_matches[0]
+        print(f"DEBUG: Original img tag: {original_img_tag}")  # Debug
+        
+        # Ellenőrizzük, hogy kép-e
+        if any(ext in fileName.lower() for ext in imageFileExtensions):
+          # Próbáljuk fájlnév alapú hivatkozással - ez automatikusan működik Confluence-ban
+          confluenceLink = f"<ac:image><ri:attachment ri:filename=\"{fileName}\" /></ac:image>"
+        else:
+          confluenceLink = f"<ac:structured-macro ac:name=\"view-file\" ac:schema-version=\"1\" ac:macro-id=\"{uuid.uuid4()}\"><ac:parameter ac:name=\"name\">{fileName}</ac:parameter><ac:parameter ac:name=\"height\">250</ac:parameter></ac:structured-macro>"
+        
+        print(f"DEBUG: Confluence link: {confluenceLink}")  # Debug
+        content = content.replace(original_img_tag, confluenceLink)
+        
+    print(f"DEBUG: Final content preview: {content[:200]}...")  # Debug
     return content
 
   @staticmethod
   def modify_link_location(content: str) -> str:
 
-    links = re.findall("src=\"/.attachments\/.*\"", content)
+    links = re.findall(r"src=\"/.attachments/.*\"", content)
     for link in links:
       file = link.split("/")[2]
       content = content.replace(link, f"src=\"{file}")
